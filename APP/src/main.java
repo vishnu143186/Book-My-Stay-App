@@ -1,15 +1,17 @@
 import java.util.*;
 
-// Reservation: Represents confirmed booking
+// Reservation (Confirmed Booking)
 class Reservation {
     private String reservationId;
     private String guestName;
     private String roomType;
+    private double totalCost;
 
-    public Reservation(String reservationId, String guestName, String roomType) {
+    public Reservation(String reservationId, String guestName, String roomType, double totalCost) {
         this.reservationId = reservationId;
         this.guestName = guestName;
         this.roomType = roomType;
+        this.totalCost = totalCost;
     }
 
     public String getReservationId() {
@@ -24,82 +26,90 @@ class Reservation {
         return roomType;
     }
 
+    public double getTotalCost() {
+        return totalCost;
+    }
+
     public void display() {
         System.out.println("Reservation ID: " + reservationId +
                 " | Guest: " + guestName +
-                " | Room: " + roomType);
+                " | Room: " + roomType +
+                " | Total Cost: ₹" + totalCost);
     }
 }
 
-// Add-On Service (Independent Component)
-class AddOnService {
-    private String serviceName;
-    private double price;
+// Booking History (State Holder)
+class BookingHistory {
 
-    public AddOnService(String serviceName, double price) {
-        this.serviceName = serviceName;
-        this.price = price;
+    // List maintains insertion order (chronological)
+    private List<Reservation> history;
+
+    public BookingHistory() {
+        history = new ArrayList<>();
     }
 
-    public String getServiceName() {
-        return serviceName;
+    // Add confirmed booking
+    public void addReservation(Reservation reservation) {
+        history.add(reservation);
+        System.out.println("Reservation stored: " + reservation.getReservationId());
     }
 
-    public double getPrice() {
-        return price;
-    }
-
-    public void display() {
-        System.out.println(serviceName + " - ₹" + price);
+    // Read-only access
+    public List<Reservation> getAllReservations() {
+        return Collections.unmodifiableList(history);
     }
 }
 
-// Add-On Service Manager
-class AddOnServiceManager {
+// Reporting Service
+class BookingReportService {
 
-    // Map<ReservationID, List of Services>
-    private Map<String, List<AddOnService>> serviceMap;
+    private BookingHistory bookingHistory;
 
-    public AddOnServiceManager() {
-        serviceMap = new HashMap<>();
+    public BookingReportService(BookingHistory bookingHistory) {
+        this.bookingHistory = bookingHistory;
     }
 
-    // Add service to reservation
-    public void addService(String reservationId, AddOnService service) {
-        serviceMap.putIfAbsent(reservationId, new ArrayList<>());
-        serviceMap.get(reservationId).add(service);
+    // Display all bookings
+    public void displayAllBookings() {
+        List<Reservation> reservations = bookingHistory.getAllReservations();
 
-        System.out.println("Added service '" + service.getServiceName() +
-                "' to Reservation ID: " + reservationId);
-    }
-
-    // View services for a reservation
-    public void viewServices(String reservationId) {
-        List<AddOnService> services = serviceMap.get(reservationId);
-
-        if (services == null || services.isEmpty()) {
-            System.out.println("No services selected for Reservation ID: " + reservationId);
+        if (reservations.isEmpty()) {
+            System.out.println("\nNo booking history available.");
             return;
         }
 
-        System.out.println("\nServices for Reservation ID: " + reservationId);
-        for (AddOnService s : services) {
-            s.display();
+        System.out.println("\n--- Booking History ---");
+        for (Reservation r : reservations) {
+            r.display();
         }
     }
 
-    // Calculate total additional cost
-    public double calculateTotalCost(String reservationId) {
-        List<AddOnService> services = serviceMap.get(reservationId);
+    // Generate summary report
+    public void generateSummaryReport() {
+        List<Reservation> reservations = bookingHistory.getAllReservations();
 
-        if (services == null) return 0;
+        int totalBookings = reservations.size();
+        double totalRevenue = 0;
 
-        double total = 0;
-        for (AddOnService s : services) {
-            total += s.getPrice();
+        Map<String, Integer> roomTypeCount = new HashMap<>();
+
+        for (Reservation r : reservations) {
+            totalRevenue += r.getTotalCost();
+
+            roomTypeCount.put(
+                    r.getRoomType(),
+                    roomTypeCount.getOrDefault(r.getRoomType(), 0) + 1
+            );
         }
 
-        return total;
+        System.out.println("\n--- Booking Summary Report ---");
+        System.out.println("Total Bookings: " + totalBookings);
+        System.out.println("Total Revenue: ₹" + totalRevenue);
+
+        System.out.println("\nBookings by Room Type:");
+        for (String type : roomTypeCount.keySet()) {
+            System.out.println(type + ": " + roomTypeCount.get(type));
+        }
     }
 }
 
@@ -108,37 +118,26 @@ public class main {
 
     public static void main(String[] args) {
 
-        // Step 1: Create Reservations (Already confirmed in previous use case)
-        Reservation r1 = new Reservation("RES101", "Alice", "Single");
-        Reservation r2 = new Reservation("RES102", "Bob", "Suite");
+        // Step 1: Booking History
+        BookingHistory history = new BookingHistory();
 
-        r1.display();
-        r2.display();
+        // Step 2: Simulate Confirmed Reservations
+        Reservation r1 = new Reservation("RES101", "Alice", "Single", 2000);
+        Reservation r2 = new Reservation("RES102", "Bob", "Suite", 6000);
+        Reservation r3 = new Reservation("RES103", "Charlie", "Single", 2200);
 
-        // Step 2: Create Add-On Services
-        AddOnService wifi = new AddOnService("Premium WiFi", 200);
-        AddOnService breakfast = new AddOnService("Breakfast", 300);
-        AddOnService spa = new AddOnService("Spa Access", 800);
+        // Step 3: Store in history (chronological order)
+        history.addReservation(r1);
+        history.addReservation(r2);
+        history.addReservation(r3);
 
-        // Step 3: Add-On Service Manager
-        AddOnServiceManager manager = new AddOnServiceManager();
+        // Step 4: Reporting Service
+        BookingReportService reportService = new BookingReportService(history);
 
-        // Step 4: Guest selects services
-        manager.addService("RES101", wifi);
-        manager.addService("RES101", breakfast);
+        // Step 5: Admin views history
+        reportService.displayAllBookings();
 
-        manager.addService("RES102", spa);
-        manager.addService("RES102", breakfast);
-
-        // Step 5: View selected services
-        manager.viewServices("RES101");
-        manager.viewServices("RES102");
-
-        // Step 6: Calculate additional cost
-        System.out.println("\nTotal Add-On Cost for RES101: ₹" +
-                manager.calculateTotalCost("RES101"));
-
-        System.out.println("Total Add-On Cost for RES102: ₹" +
-                manager.calculateTotalCost("RES102"));
+        // Step 6: Generate summary report
+        reportService.generateSummaryReport();
     }
 }
