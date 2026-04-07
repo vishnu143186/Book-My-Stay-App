@@ -1,13 +1,19 @@
 import java.util.*;
 
-// Reservation: Booking Request
+// Reservation: Represents confirmed booking
 class Reservation {
+    private String reservationId;
     private String guestName;
     private String roomType;
 
-    public Reservation(String guestName, String roomType) {
+    public Reservation(String reservationId, String guestName, String roomType) {
+        this.reservationId = reservationId;
         this.guestName = guestName;
         this.roomType = roomType;
+    }
+
+    public String getReservationId() {
+        return reservationId;
     }
 
     public String getGuestName() {
@@ -17,114 +23,83 @@ class Reservation {
     public String getRoomType() {
         return roomType;
     }
-}
 
-// Inventory Service: Maintains room counts
-class InventoryService {
-    private Map<String, Integer> inventory;
-
-    public InventoryService() {
-        inventory = new HashMap<>();
-    }
-
-    public void addRoom(String type, int count) {
-        inventory.put(type, count);
-    }
-
-    public int getAvailability(String type) {
-        return inventory.getOrDefault(type, 0);
-    }
-
-    // Decrement after allocation
-    public void decrementRoom(String type) {
-        inventory.put(type, inventory.get(type) - 1);
+    public void display() {
+        System.out.println("Reservation ID: " + reservationId +
+                " | Guest: " + guestName +
+                " | Room: " + roomType);
     }
 }
 
-// Booking Request Queue (FIFO)
-class BookingRequestQueue {
-    private Queue<Reservation> queue = new LinkedList<>();
+// Add-On Service (Independent Component)
+class AddOnService {
+    private String serviceName;
+    private double price;
 
-    public void addRequest(Reservation r) {
-        queue.offer(r);
+    public AddOnService(String serviceName, double price) {
+        this.serviceName = serviceName;
+        this.price = price;
     }
 
-    public Reservation getNextRequest() {
-        return queue.poll(); // dequeue
+    public String getServiceName() {
+        return serviceName;
     }
 
-    public boolean isEmpty() {
-        return queue.isEmpty();
+    public double getPrice() {
+        return price;
+    }
+
+    public void display() {
+        System.out.println(serviceName + " - ₹" + price);
     }
 }
 
-// Booking Service: Handles allocation
-class BookingService {
+// Add-On Service Manager
+class AddOnServiceManager {
 
-    private InventoryService inventoryService;
+    // Map<ReservationID, List of Services>
+    private Map<String, List<AddOnService>> serviceMap;
 
-    // Map room type -> allocated room IDs
-    private Map<String, Set<String>> allocatedRooms;
-
-    // Global set to ensure uniqueness
-    private Set<String> allAllocatedRoomIds;
-
-    public BookingService(InventoryService inventoryService) {
-        this.inventoryService = inventoryService;
-        this.allocatedRooms = new HashMap<>();
-        this.allAllocatedRoomIds = new HashSet<>();
+    public AddOnServiceManager() {
+        serviceMap = new HashMap<>();
     }
 
-    // Generate unique room ID
-    private String generateRoomId(String roomType) {
-        String roomId;
-        do {
-            roomId = roomType.substring(0, 2).toUpperCase() + "_" + UUID.randomUUID().toString().substring(0, 5);
-        } while (allAllocatedRoomIds.contains(roomId)); // ensure uniqueness
+    // Add service to reservation
+    public void addService(String reservationId, AddOnService service) {
+        serviceMap.putIfAbsent(reservationId, new ArrayList<>());
+        serviceMap.get(reservationId).add(service);
 
-        return roomId;
+        System.out.println("Added service '" + service.getServiceName() +
+                "' to Reservation ID: " + reservationId);
     }
 
-    // Process booking request
-    public void processRequest(Reservation reservation) {
+    // View services for a reservation
+    public void viewServices(String reservationId) {
+        List<AddOnService> services = serviceMap.get(reservationId);
 
-        String type = reservation.getRoomType();
-
-        System.out.println("\nProcessing request for " + reservation.getGuestName() + " (" + type + ")");
-
-        // Check availability
-        if (inventoryService.getAvailability(type) <= 0) {
-            System.out.println("Booking Failed: No rooms available for " + type);
+        if (services == null || services.isEmpty()) {
+            System.out.println("No services selected for Reservation ID: " + reservationId);
             return;
         }
 
-        // Generate unique room ID
-        String roomId = generateRoomId(type);
-
-        // Initialize set if not present
-        allocatedRooms.putIfAbsent(type, new HashSet<>());
-
-        // Add to both sets
-        allocatedRooms.get(type).add(roomId);
-        allAllocatedRoomIds.add(roomId);
-
-        // Update inventory (atomic step)
-        inventoryService.decrementRoom(type);
-
-        // Confirm booking
-        System.out.println("Booking Confirmed!");
-        System.out.println("Guest: " + reservation.getGuestName());
-        System.out.println("Room Type: " + type);
-        System.out.println("Assigned Room ID: " + roomId);
-        System.out.println("Remaining " + type + " Rooms: " + inventoryService.getAvailability(type));
+        System.out.println("\nServices for Reservation ID: " + reservationId);
+        for (AddOnService s : services) {
+            s.display();
+        }
     }
 
-    // Process entire queue (FIFO)
-    public void processAllRequests(BookingRequestQueue queue) {
-        while (!queue.isEmpty()) {
-            Reservation r = queue.getNextRequest();
-            processRequest(r);
+    // Calculate total additional cost
+    public double calculateTotalCost(String reservationId) {
+        List<AddOnService> services = serviceMap.get(reservationId);
+
+        if (services == null) return 0;
+
+        double total = 0;
+        for (AddOnService s : services) {
+            total += s.getPrice();
         }
+
+        return total;
     }
 }
 
@@ -133,23 +108,37 @@ public class main {
 
     public static void main(String[] args) {
 
-        // Step 1: Setup Inventory
-        InventoryService inventory = new InventoryService();
-        inventory.addRoom("Single", 2);
-        inventory.addRoom("Double", 1);
-        inventory.addRoom("Suite", 1);
+        // Step 1: Create Reservations (Already confirmed in previous use case)
+        Reservation r1 = new Reservation("RES101", "Alice", "Single");
+        Reservation r2 = new Reservation("RES102", "Bob", "Suite");
 
-        // Step 2: Setup Booking Queue (FIFO)
-        BookingRequestQueue queue = new BookingRequestQueue();
-        queue.addRequest(new Reservation("Alice", "Single"));
-        queue.addRequest(new Reservation("Bob", "Suite"));
-        queue.addRequest(new Reservation("Charlie", "Single"));
-        queue.addRequest(new Reservation("David", "Single")); // should fail
+        r1.display();
+        r2.display();
 
-        // Step 3: Booking Service
-        BookingService bookingService = new BookingService(inventory);
+        // Step 2: Create Add-On Services
+        AddOnService wifi = new AddOnService("Premium WiFi", 200);
+        AddOnService breakfast = new AddOnService("Breakfast", 300);
+        AddOnService spa = new AddOnService("Spa Access", 800);
 
-        // Step 4: Process Requests
-        bookingService.processAllRequests(queue);
+        // Step 3: Add-On Service Manager
+        AddOnServiceManager manager = new AddOnServiceManager();
+
+        // Step 4: Guest selects services
+        manager.addService("RES101", wifi);
+        manager.addService("RES101", breakfast);
+
+        manager.addService("RES102", spa);
+        manager.addService("RES102", breakfast);
+
+        // Step 5: View selected services
+        manager.viewServices("RES101");
+        manager.viewServices("RES102");
+
+        // Step 6: Calculate additional cost
+        System.out.println("\nTotal Add-On Cost for RES101: ₹" +
+                manager.calculateTotalCost("RES101"));
+
+        System.out.println("Total Add-On Cost for RES102: ₹" +
+                manager.calculateTotalCost("RES102"));
     }
 }
